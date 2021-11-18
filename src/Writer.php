@@ -11,6 +11,7 @@ use Nikazooz\Simplesheet\Files\RemoteTemporaryFile;
 use Nikazooz\Simplesheet\Files\TemporaryFile;
 use Nikazooz\Simplesheet\Files\TemporaryFileFactory;
 use Nikazooz\Simplesheet\Writers\Sheet;
+use Box\Spout\Writer\Common\Creator\WriterFactory as SpoutWriterFactory;
 
 class Writer
 {
@@ -64,7 +65,7 @@ class Writer
      * @param  string  $writerType
      * @return $this
      */
-    private function open($export, $writerType)
+    public function open($export, $writerType)
     {
         if ($export instanceof WithEvents) {
             $this->registerListeners($export->registerEvents());
@@ -78,12 +79,27 @@ class Writer
     }
 
     /**
+     * @param TemporaryFile $tempFile
+     * @param string $writerType
+     *
+     * @return Writer
+     * @throws \Box\Spout\Common\Exception\IOException
+     */
+    public function reopen(TemporaryFile $tempFile, string $writerType)
+    {
+        $this->spoutWriter = SpoutWriterFactory::createFromType($writerType);
+        $this->spoutWriter->openToFile($tempFile->sync()->getLocalPath());
+
+        return $this;
+    }
+
+    /**
      * @param  object  $export
      * @param  \Nikazooz\Simplesheet\Files\TemporaryFile  $temporaryFile
      * @param  string  $writerType
      * @return \Nikazooz\Simplesheet\Files\TemporaryFile
      */
-    private function write($export, TemporaryFile $temporaryFile, string $writerType)
+    public function write($export, TemporaryFile $temporaryFile, string $writerType)
     {
         $this->throwExceptionIfWriterIsNotSet();
 
@@ -136,6 +152,16 @@ class Writer
     {
         $this->throwExceptionIfWriterIsNotSet();
 
+        return new Sheet($this->spoutWriter, $sheetIndex, $this->chunkSize);
+    }
+
+    /**
+     * @param int $sheetIndex
+     *
+     * @return Sheet
+     */
+    public function getSheetByIndex(int $sheetIndex)
+    {
         return new Sheet($this->spoutWriter, $sheetIndex, $this->chunkSize);
     }
 
