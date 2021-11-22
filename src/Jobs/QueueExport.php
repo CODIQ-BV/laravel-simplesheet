@@ -58,8 +58,6 @@ class QueueExport implements ShouldQueue
      */
     public function handle(Writer $writer)
     {
-        $writer->export($this->export, $this->writerType, $this->temporaryFile->sync());
-
         $writer->open($this->export, $this->writerType);
 
         $sheetExports = [$this->export];

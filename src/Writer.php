@@ -61,8 +61,8 @@ class Writer
             $sheetExports = $export->sheets();
         }
 
-        foreach ($sheetExports as $sheetExport) {
-            $this->addNewSheet()->export($sheetExport);
+        foreach ($sheetExports as $sheetIndex => $sheetExport) {
+            $this->addNewSheet($sheetIndex)->export($sheetExport);
         }
 
         $temporaryFile = $temporaryFile ?? $this->temporaryFileFactory->makeLocal();
