@@ -46,14 +46,24 @@ class Writer
     }
 
     /**
-     * @param  object  $export
-     * @param  string  $writerType
-     * @param  TemporaryFile|null  $temporaryFile
+     * @param object $export
+     * @param string $writerType
+     * @param TemporaryFile|null $temporaryFile
      * @return TemporaryFile
+     * @throws \Exception
      */
     public function export($export, string $writerType, TemporaryFile $temporaryFile = null): TemporaryFile
     {
         $this->open($export, $writerType);
+
+        $sheetExports = [$export];
+        if ($export instanceof WithMultipleSheets) {
+            $sheetExports = $export->sheets();
+        }
+
+        foreach ($sheetExports as $sheetExport) {
+            $this->addNewSheet()->export($sheetExport);
+        }
 
         $temporaryFile = $temporaryFile ?? $this->temporaryFileFactory->makeLocal();
 

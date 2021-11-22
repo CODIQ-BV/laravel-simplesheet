@@ -63,6 +63,8 @@ class CloseSheet implements ShouldQueue
             $sheet->registerListeners($this->sheetExport->registerEvents());
         }
 
+        $sheet->close($this->sheetExport);
+
         $writer->write(
             $this->sheetExport,
             $this->temporaryFile,

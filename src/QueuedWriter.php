@@ -63,9 +63,7 @@ class QueuedWriter
         ));
 
         return new PendingDispatch(
-            (new QueueExport($export, $temporaryFile, $writerType))->chain([
-                new StoreQueuedExport($temporaryFile, $filePath, $disk, $diskOptions),
-            ])
+            (new QueueExport($export, $temporaryFile, $writerType))->chain($jobs->toArray())
         );
     }
 

@@ -42,6 +42,11 @@ class Sheet
     protected $chunkSize;
 
     /**
+     * @var object
+     */
+    protected $exportable;
+
+    /**
      * New Sheet.
      *
      * @param  \Box\Spout\Writer\WriterInterface  $spoutWriter
@@ -57,15 +62,17 @@ class Sheet
     }
 
     /**
-     * @param  object  $sheetExport
+     * @param object $sheetExport
      */
-    public function export($sheetExport)
+    public function open($sheetExport)
     {
+        $this->exportable = $sheetExport;
+
         if ($sheetExport instanceof WithEvents) {
             $this->registerListeners($sheetExport->registerEvents());
         }
 
-        $this->raise(new BeforeSheet($this, $sheetExport));
+        $this->raise(new BeforeSheet($this, $this->exportable));
 
         // CSV files don't support multiple sheets, we can only write the first one.
         if ($this->multipleSheetsAreNotSupported() && $this->isNotTheFirstOne()) {
@@ -78,7 +85,6 @@ class Sheet
             $this->setSheetTitle($sheetExport);
         }
 
-        // Empty headings array meens we should skip adding headings
         if ($sheetExport instanceof WithHeadings && $sheetExport->headings()) {
             $headings = ArrayHelper::ensureMultipleRows($sheetExport->headings());
 
@@ -86,6 +92,14 @@ class Sheet
                 $this->appendRow($heading);
             }
         }
+    }
+
+    /**
+     * @param  object  $sheetExport
+     */
+    public function export($sheetExport)
+    {
+        $this->open($sheetExport);
 
         if ($sheetExport instanceof FromQuery) {
             $this->fromQuery($sheetExport);
@@ -103,7 +117,17 @@ class Sheet
             $this->fromIterator($sheetExport);
         }
 
-        $this->raise(new AfterSheet($this, $sheetExport));
+        $this->close($sheetExport);
+    }
+
+    /**
+     * @param object $sheetExport
+     */
+    public function close($sheetExport)
+    {
+        $this->exportable = $sheetExport;
+
+        $this->raise(new AfterSheet($this, $this->exportable));
     }
 
     /**
