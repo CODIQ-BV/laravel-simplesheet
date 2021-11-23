@@ -127,6 +127,9 @@ class Writer
         $this->raise(new BeforeWriting($this, $this->exportable));
 
         $this->spoutWriter = WriterFactory::make($writerType, $export);
+
+        $sheet = $this->getSheetByIndex(0);
+        $sheet->setSheetAsActive();
         $this->spoutWriter->openToFile($temporaryFile->getLocalPath());
 
         //foreach ($this->getSheetExports($export) as $sheetIndex => $sheetExport) {

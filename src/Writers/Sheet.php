@@ -185,7 +185,7 @@ class Sheet
      */
     public function appendRows($rows, $sheetExport)
     {
-        Collection::make($rows)->flatMap(function ($row) use ($sheetExport) {
+        $rows = (new Collection($rows))->flatMap(function ($row) use ($sheetExport) {
             if ($sheetExport instanceof WithMapping) {
                 $row = $sheetExport->map($row);
             }
@@ -193,9 +193,11 @@ class Sheet
             return ArrayHelper::ensureMultipleRows(
                 static::mapArraybleRow($row)
             );
-        })->each(function ($row) {
+        })->toArray();
+
+        foreach ($rows as $row) {
             $this->appendRow($row);
-        });
+        }
     }
 
     /**
@@ -288,7 +290,7 @@ class Sheet
     /**
      * @return void
      */
-    protected function setSheetAsActive()
+    public function setSheetAsActive()
     {
         // If we're working with format that doesn't support multiple sheets,
         // (like CSV), we only have one sheet and it is already active.
