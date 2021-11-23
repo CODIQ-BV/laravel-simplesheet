@@ -169,6 +169,16 @@ class Sheet
     }
 
     /**
+     * @param string $concern
+     *
+     * @return string
+     */
+    public function hasConcern(string $concern): string
+    {
+        return $this->exportable instanceof $concern;
+    }
+
+    /**
      * @param  iterable  $rows
      * @param  object  $sheetExport
      * @return void

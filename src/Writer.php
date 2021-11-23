@@ -33,6 +33,11 @@ class Writer
     protected $chunkSize;
 
     /**
+     * @var object
+     */
+    protected $exportable;
+
+    /**
      * New Writer instance.
      *
      * @param  \Nikazooz\Simplesheet\Files\TemporaryFileFactory  $temporaryFileFactory
@@ -77,13 +82,17 @@ class Writer
      */
     public function open($export, $writerType)
     {
+        $this->exportable = $export;
+
         if ($export instanceof WithEvents) {
             $this->registerListeners($export->registerEvents());
         }
 
-        $this->raise(new BeforeExport($this, $export));
+        $this->exportable  = $export;
 
-        $this->spoutWriter = WriterFactory::make($writerType, $export);
+        $this->raise(new BeforeExport($this, $this->exportable));
+
+        $this->spoutWriter = WriterFactory::make($writerType, $this->exportable);
 
         return $this;
     }
@@ -113,19 +122,22 @@ class Writer
     {
         $this->throwExceptionIfWriterIsNotSet();
 
-        $this->raise(new BeforeWriting($this, $export));
+        $this->exportable = $export;
 
+        $this->raise(new BeforeWriting($this, $this->exportable));
+
+        $this->spoutWriter = WriterFactory::make($writerType, $export);
         $this->spoutWriter->openToFile($temporaryFile->getLocalPath());
 
-        foreach ($this->getSheetExports($export) as $sheetIndex => $sheetExport) {
-            $this->addNewSheet($sheetIndex)->export($sheetExport);
-        }
-
-        $this->cleanUp();
+        //foreach ($this->getSheetExports($export) as $sheetIndex => $sheetExport) {
+        //    $this->addNewSheet($sheetIndex)->export($sheetExport);
+        //}
 
         if ($temporaryFile instanceof RemoteTemporaryFile) {
             $temporaryFile->updateRemote();
         }
+
+        $this->cleanUp();
 
         return $temporaryFile;
     }
@@ -173,6 +185,16 @@ class Writer
     public function getSheetByIndex(int $sheetIndex)
     {
         return new Sheet($this->spoutWriter, $sheetIndex, $this->chunkSize);
+    }
+
+    /**
+     * @param string $concern
+     *
+     * @return bool
+     */
+    public function hasConcern($concern): bool
+    {
+        return $this->exportable instanceof $concern;
     }
 
     /**
