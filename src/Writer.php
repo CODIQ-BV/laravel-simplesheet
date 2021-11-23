@@ -125,7 +125,6 @@ class Writer
 
         $this->spoutWriter = WriterFactory::make($writerType, $export);
 
-        //$sheet = $this->getSheetByIndex(0);
         //$sheet->setSheetAsActive();
         $this->spoutWriter->openToFile($temporaryFile->getLocalPath());
         //$this->spoutWriter->addRow()
@@ -133,6 +132,10 @@ class Writer
         //foreach ($this->getSheetExports($export) as $sheetIndex => $sheetExport) {
         //    $this->addNewSheet($sheetIndex)->export($sheetExport);
         //}
+
+        $sheet = $this->getSheetByIndex(0);
+        //$sheet->export($export);
+        //$sheet->appendRows($export->array(), $export);
 
         if ($temporaryFile instanceof RemoteTemporaryFile) {
             $temporaryFile->updateRemote();
