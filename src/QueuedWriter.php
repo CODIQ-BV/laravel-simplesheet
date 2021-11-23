@@ -36,7 +36,7 @@ class QueuedWriter
      */
     public function __construct(TemporaryFileFactory $temporaryFileFactory)
     {
-        $this->chunkSize = config('excel.exports.chunk_size', 1000);
+        $this->chunkSize = config('simplesheet.exports.chunk_size', 1000);
         $this->temporaryFileFactory = $temporaryFileFactory;
     }
 
@@ -53,7 +53,8 @@ class QueuedWriter
         $extension = pathinfo($filePath, PATHINFO_EXTENSION);
         $temporaryFile = $this->temporaryFileFactory->make($extension);
 
-        $jobs = $this->buildExportJobs($export, $temporaryFile, $writerType);
+        $jobs = new Collection;
+        //$jobs = $this->buildExportJobs($export, $temporaryFile, $writerType);
 
         $jobs->push(new StoreQueuedExport(
             $temporaryFile,

@@ -53,11 +53,10 @@ class Writer
     /**
      * @param object $export
      * @param string $writerType
-     * @param TemporaryFile|null $temporaryFile
      * @return TemporaryFile
      * @throws \Exception
      */
-    public function export($export, string $writerType, TemporaryFile $temporaryFile = null): TemporaryFile
+    public function export($export, string $writerType): TemporaryFile
     {
         $this->open($export, $writerType);
 
@@ -70,9 +69,7 @@ class Writer
             $this->addNewSheet($sheetIndex)->export($sheetExport);
         }
 
-        $temporaryFile = $temporaryFile ?? $this->temporaryFileFactory->makeLocal();
-
-        return $this->write($export, $temporaryFile, $writerType);
+        return $this->write($export, $this->temporaryFileFactory->makeLocal(null, strtolower($writerType)), $writerType);
     }
 
     /**
@@ -128,9 +125,10 @@ class Writer
 
         $this->spoutWriter = WriterFactory::make($writerType, $export);
 
-        $sheet = $this->getSheetByIndex(0);
-        $sheet->setSheetAsActive();
+        //$sheet = $this->getSheetByIndex(0);
+        //$sheet->setSheetAsActive();
         $this->spoutWriter->openToFile($temporaryFile->getLocalPath());
+        //$this->spoutWriter->addRow()
 
         //foreach ($this->getSheetExports($export) as $sheetIndex => $sheetExport) {
         //    $this->addNewSheet($sheetIndex)->export($sheetExport);
