@@ -3,6 +3,7 @@
 namespace Nikazooz\Simplesheet\Jobs;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Nikazooz\Simplesheet\Files\Filesystem;
 use Nikazooz\Simplesheet\Files\TemporaryFile;

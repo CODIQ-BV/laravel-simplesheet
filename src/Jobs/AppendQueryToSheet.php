@@ -89,8 +89,8 @@ class AppendQueryToSheet implements ShouldQueue
 
         $query = $this->sheetExport->query()->forPage($this->page, $this->chunkSize);
 
-        $sheet->appendRows($query->get(), $this->sheetExport);
+        $rowsToAppend = $sheet->getRowsToAppend($query->get(), $this->sheetExport);
 
-        $writer->write($this->sheetExport, $this->temporaryFile, $this->writerType);
+        $writer->reopen($this->temporaryFile, $this->writerType, $rowsToAppend, $this->sheetIndex);
     }
 }

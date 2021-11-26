@@ -201,6 +201,35 @@ class Sheet
         }
     }
 
+    public function getRowsToAppend($rows, $sheetExport): array
+    {
+        $rows = (new Collection($rows))->flatMap(function ($row) use ($sheetExport) {
+            if ($sheetExport instanceof WithMapping) {
+                $row = $sheetExport->map($row);
+            }
+
+            return ArrayHelper::ensureMultipleRows(
+                static::mapArraybleRow($row)
+            );
+        })->toArray();
+
+        $rowsToAppend = [];
+        foreach ($rows as $row) {
+            $rowsToAppend[] = $this->getRowToAppend($row);
+        }
+
+        return $rowsToAppend;
+    }
+
+    public function getRowToAppend($row): Row
+    {
+        $cells = array_map(function ($value) {
+            return new Cell($value);
+        }, $row);
+
+        return new Row($cells, null);
+    }
+
     /**
      * @param  mixed  $row
      * @return array
@@ -238,7 +267,6 @@ class Sheet
         }, $row);
 
         $this->spoutWriter->addRow(new Row($cells, null));
-        $this->spoutWriter->
     }
 
     /**

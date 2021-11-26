@@ -58,7 +58,7 @@ class QueueExport implements ShouldQueue
      */
     public function handle(Writer $writer)
     {
-        $writer->open($this->export, $this->writerType);
+        $writer->open($this->export, $this->writerType, $this->temporaryFile);
 
         $sheetExports = [$this->export];
         if ($this->export instanceof WithMultipleSheets) {
@@ -67,13 +67,11 @@ class QueueExport implements ShouldQueue
 
         // Pre-create the worksheets
         foreach ($sheetExports as $sheetIndex => $sheetExport) {
-            $writer->reopen($this->temporaryFile, $this->writerType);
             $sheet = $writer->addNewSheet($sheetIndex);
             $sheet->open($sheetExport);
         }
 
-        // Write to temp file with empty sheets.
-        //$writer->write($sheetExport, $this->temporaryFile, $this->writerType);
+        $writer->cleanUp();
     }
 
     /**

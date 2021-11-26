@@ -53,7 +53,6 @@ class QueuedWriter
         $extension = pathinfo($filePath, PATHINFO_EXTENSION);
         $temporaryFile = $this->temporaryFileFactory->make($extension);
 
-        //$jobs = new Collection;
         $jobs = $this->buildExportJobs($export, $temporaryFile, $writerType);
 
         $jobs->push(new StoreQueuedExport(
@@ -83,11 +82,11 @@ class QueuedWriter
 
         $jobs = new Collection;
         foreach ($sheetExports as $sheetIndex => $sheetExport) {
-            //if ($sheetExport instanceof FromCollection) {
-            //    $jobs = $jobs->merge($this->exportCollection($sheetExport, $temporaryFile, $writerType, $sheetIndex));
-            //} elseif ($sheetExport instanceof FromQuery) {
-            //    $jobs = $jobs->merge($this->exportQuery($sheetExport, $temporaryFile, $writerType, $sheetIndex));
-            //}
+            if ($sheetExport instanceof FromCollection) {
+                $jobs = $jobs->merge($this->exportCollection($sheetExport, $temporaryFile, $writerType, $sheetIndex));
+            } elseif ($sheetExport instanceof FromQuery) {
+                $jobs = $jobs->merge($this->exportQuery($sheetExport, $temporaryFile, $writerType, $sheetIndex));
+            }
 
             $jobs->push(new CloseSheet($sheetExport, $temporaryFile, $writerType, $sheetIndex));
         }
