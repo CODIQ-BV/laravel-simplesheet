@@ -4,6 +4,7 @@ namespace Nikazooz\Simplesheet\Writers;
 
 use Box\Spout\Common\Entity\Cell;
 use Box\Spout\Common\Entity\Row;
+use Illuminate\Support\Facades\Log;
 use Box\Spout\Writer\WriterInterface;
 use Box\Spout\Writer\WriterMultiSheetsAbstract;
 use Illuminate\Contracts\Support\Arrayable;
@@ -42,6 +43,11 @@ class Sheet
     protected $chunkSize;
 
     /**
+     * @var object
+     */
+    protected $exportable;
+
+    /**
      * New Sheet.
      *
      * @param  \Box\Spout\Writer\WriterInterface  $spoutWriter
@@ -57,15 +63,17 @@ class Sheet
     }
 
     /**
-     * @param  object  $sheetExport
+     * @param object $sheetExport
      */
-    public function export($sheetExport)
+    public function open($sheetExport)
     {
+        $this->exportable = $sheetExport;
+
         if ($sheetExport instanceof WithEvents) {
             $this->registerListeners($sheetExport->registerEvents());
         }
 
-        $this->raise(new BeforeSheet($this, $sheetExport));
+        $this->raise(new BeforeSheet($this, $this->exportable));
 
         // CSV files don't support multiple sheets, we can only write the first one.
         if ($this->multipleSheetsAreNotSupported() && $this->isNotTheFirstOne()) {
@@ -78,7 +86,6 @@ class Sheet
             $this->setSheetTitle($sheetExport);
         }
 
-        // Empty headings array meens we should skip adding headings
         if ($sheetExport instanceof WithHeadings && $sheetExport->headings()) {
             $headings = ArrayHelper::ensureMultipleRows($sheetExport->headings());
 
@@ -86,6 +93,14 @@ class Sheet
                 $this->appendRow($heading);
             }
         }
+    }
+
+    /**
+     * @param  object  $sheetExport
+     */
+    public function export($sheetExport)
+    {
+        $this->open($sheetExport);
 
         if ($sheetExport instanceof FromQuery) {
             $this->fromQuery($sheetExport);
@@ -103,7 +118,17 @@ class Sheet
             $this->fromIterator($sheetExport);
         }
 
-        $this->raise(new AfterSheet($this, $sheetExport));
+        $this->close($sheetExport);
+    }
+
+    /**
+     * @param object $sheetExport
+     */
+    public function close($sheetExport)
+    {
+        $this->exportable = $sheetExport;
+
+        $this->raise(new AfterSheet($this, $this->exportable));
     }
 
     /**
@@ -145,13 +170,23 @@ class Sheet
     }
 
     /**
+     * @param string $concern
+     *
+     * @return string
+     */
+    public function hasConcern(string $concern): string
+    {
+        return $this->exportable instanceof $concern;
+    }
+
+    /**
      * @param  iterable  $rows
      * @param  object  $sheetExport
      * @return void
      */
     public function appendRows($rows, $sheetExport)
     {
-        Collection::make($rows)->flatMap(function ($row) use ($sheetExport) {
+        $rows = (new Collection($rows))->flatMap(function ($row) use ($sheetExport) {
             if ($sheetExport instanceof WithMapping) {
                 $row = $sheetExport->map($row);
             }
@@ -159,9 +194,40 @@ class Sheet
             return ArrayHelper::ensureMultipleRows(
                 static::mapArraybleRow($row)
             );
-        })->each(function ($row) {
+        })->toArray();
+
+        foreach ($rows as $row) {
             $this->appendRow($row);
-        });
+        }
+    }
+
+    public function getRowsToAppend($rows, $sheetExport): array
+    {
+        $rows = (new Collection($rows))->flatMap(function ($row) use ($sheetExport) {
+            if ($sheetExport instanceof WithMapping) {
+                $row = $sheetExport->map($row);
+            }
+
+            return ArrayHelper::ensureMultipleRows(
+                static::mapArraybleRow($row)
+            );
+        })->toArray();
+
+        $rowsToAppend = [];
+        foreach ($rows as $row) {
+            $rowsToAppend[] = $this->getRowToAppend($row);
+        }
+
+        return $rowsToAppend;
+    }
+
+    public function getRowToAppend($row): Row
+    {
+        $cells = array_map(function ($value) {
+            return new Cell($value);
+        }, $row);
+
+        return new Row($cells, null);
     }
 
     /**
@@ -254,7 +320,7 @@ class Sheet
     /**
      * @return void
      */
-    protected function setSheetAsActive()
+    public function setSheetAsActive()
     {
         // If we're working with format that doesn't support multiple sheets,
         // (like CSV), we only have one sheet and it is already active.

@@ -52,21 +52,6 @@ class CloseSheet implements ShouldQueue
      */
     public function handle(Writer $writer)
     {
-        $writer = $writer->reopen(
-            $this->temporaryFile,
-            $this->writerType
-        );
 
-        $sheet = $writer->getSheetByIndex($this->sheetIndex);
-
-        if ($this->sheetExport instanceof WithEvents) {
-            $sheet->registerListeners($this->sheetExport->registerEvents());
-        }
-
-        $writer->write(
-            $this->sheetExport,
-            $this->temporaryFile,
-            $this->writerType
-        );
     }
 }

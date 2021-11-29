@@ -11,6 +11,7 @@ use Nikazooz\Simplesheet\Files\RemoteTemporaryFile;
 use Nikazooz\Simplesheet\Files\TemporaryFile;
 use Nikazooz\Simplesheet\Files\TemporaryFileFactory;
 use Nikazooz\Simplesheet\Writers\Sheet;
+use Box\Spout\Reader\Common\Creator\ReaderFactory as SpoutReaderFactory;
 use Box\Spout\Writer\Common\Creator\WriterFactory as SpoutWriterFactory;
 
 class Writer
@@ -33,6 +34,11 @@ class Writer
     protected $chunkSize;
 
     /**
+     * @var object
+     */
+    protected $exportable;
+
+    /**
      * New Writer instance.
      *
      * @param  \Nikazooz\Simplesheet\Files\TemporaryFileFactory  $temporaryFileFactory
@@ -46,18 +52,26 @@ class Writer
     }
 
     /**
-     * @param  object  $export
-     * @param  string  $writerType
-     * @param  TemporaryFile|null  $temporaryFile
+     * @param object $export
+     * @param string $writerType
      * @return TemporaryFile
+     * @throws \Exception
      */
-    public function export($export, string $writerType, TemporaryFile $temporaryFile = null): TemporaryFile
+    public function export($export, string $writerType): TemporaryFile
     {
-        $this->open($export, $writerType);
+        $tempFile = $this->temporaryFileFactory->makeLocal(null, strtolower($writerType));
+        $this->open($export, $writerType, $tempFile);
 
-        $temporaryFile = $temporaryFile ?? $this->temporaryFileFactory->makeLocal();
+        $sheetExports = [$export];
+        if ($export instanceof WithMultipleSheets) {
+            $sheetExports = $export->sheets();
+        }
 
-        return $this->write($export, $temporaryFile, $writerType);
+        foreach ($sheetExports as $sheetIndex => $sheetExport) {
+            $this->addNewSheet($sheetIndex)->export($sheetExport);
+        }
+
+        return $this->write($export, $tempFile, $writerType);
     }
 
     /**
@@ -65,15 +79,20 @@ class Writer
      * @param  string  $writerType
      * @return $this
      */
-    public function open($export, $writerType)
+    public function open($export, $writerType, TemporaryFile $temporaryFile)
     {
+        $this->exportable = $export;
+
         if ($export instanceof WithEvents) {
             $this->registerListeners($export->registerEvents());
         }
 
-        $this->raise(new BeforeExport($this, $export));
+        $this->exportable  = $export;
 
-        $this->spoutWriter = WriterFactory::make($writerType, $export);
+        $this->raise(new BeforeExport($this, $this->exportable));
+
+        $this->spoutWriter = WriterFactory::make($writerType, $this->exportable);
+        $this->spoutWriter->openToFile($temporaryFile->sync()->getLocalPath());
 
         return $this;
     }
@@ -85,10 +104,38 @@ class Writer
      * @return Writer
      * @throws \Box\Spout\Common\Exception\IOException
      */
-    public function reopen(TemporaryFile $tempFile, string $writerType)
+    public function reopen(TemporaryFile $tempFile, string $writerType, array $rowsToAppend = [], int $sheetIndexWhereRowWillBeAppend = null)
     {
+        $extension = pathinfo($tempFile->getLocalPath(), PATHINFO_EXTENSION);
+
+        $reader = SpoutReaderFactory::createFromFile($tempFile->getLocalPath());
+        $reader->open($tempFile->getLocalPath());
+        $reader->setShouldFormatDates(true);
+
+        $newTempFile = $this->temporaryFileFactory->make($extension);
+
         $this->spoutWriter = SpoutWriterFactory::createFromType($writerType);
-        $this->spoutWriter->openToFile($tempFile->sync()->getLocalPath());
+        $this->spoutWriter->openToFile($newTempFile->getLocalPath());
+
+        foreach ($reader->getSheetIterator() as $sheetIndex => $sheet) {
+            if ($sheetIndex !== 1) {
+                $this->spoutWriter->addNewSheetAndMakeItCurrent();
+            }
+
+            foreach ($sheet->getRowIterator() as $rowIndex => $row) {
+                $this->spoutWriter->addRow($row);
+            }
+
+            if ($sheetIndex === $sheetIndexWhereRowWillBeAppend + 1) {
+                foreach ($rowsToAppend as $rowIndex => $row) {
+                    $this->spoutWriter->addRow($row);
+                }
+            }
+        }
+        $reader->close();
+        $this->spoutWriter->close();
+
+        $tempFile->copyFrom($newTempFile->getLocalPath());
 
         return $this;
     }
@@ -103,15 +150,13 @@ class Writer
     {
         $this->throwExceptionIfWriterIsNotSet();
 
-        $this->raise(new BeforeWriting($this, $export));
+        $this->exportable = $export;
 
-        $this->spoutWriter->openToFile($temporaryFile->getLocalPath());
+        $this->raise(new BeforeWriting($this, $this->exportable));
 
-        foreach ($this->getSheetExports($export) as $sheetIndex => $sheetExport) {
-            $this->addNewSheet($sheetIndex)->export($sheetExport);
-        }
+        $this->spoutWriter = WriterFactory::make($writerType, $export);
 
-        $this->cleanUp();
+        $sheet = $this->getSheetByIndex(0);
 
         if ($temporaryFile instanceof RemoteTemporaryFile) {
             $temporaryFile->updateRemote();
@@ -136,7 +181,7 @@ class Writer
     /**
      * @return void
      */
-    private function cleanUp()
+    public function cleanUp()
     {
         $this->spoutWriter->close();
         unset($this->spoutWriter);
@@ -163,6 +208,16 @@ class Writer
     public function getSheetByIndex(int $sheetIndex)
     {
         return new Sheet($this->spoutWriter, $sheetIndex, $this->chunkSize);
+    }
+
+    /**
+     * @param string $concern
+     *
+     * @return bool
+     */
+    public function hasConcern($concern): bool
+    {
+        return $this->exportable instanceof $concern;
     }
 
     /**

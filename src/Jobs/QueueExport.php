@@ -7,6 +7,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Nikazooz\Simplesheet\Files\TemporaryFile;
 use Nikazooz\Simplesheet\Writer;
 use Throwable;
+use Nikazooz\Simplesheet\Concerns\WithMultipleSheets;
 
 class QueueExport implements ShouldQueue
 {
@@ -51,12 +52,26 @@ class QueueExport implements ShouldQueue
     }
 
     /**
-     * @param  \Nikazooz\Simplesheet\Writer  $writer
+     * @param \Nikazooz\Simplesheet\Writer $writer
      * @return void
+     * @throws \Exception
      */
     public function handle(Writer $writer)
     {
-        $writer->export($this->export, $this->writerType, $this->temporaryFile->sync());
+        $writer->open($this->export, $this->writerType, $this->temporaryFile);
+
+        $sheetExports = [$this->export];
+        if ($this->export instanceof WithMultipleSheets) {
+            $sheetExports = $this->export->sheets();
+        }
+
+        // Pre-create the worksheets
+        foreach ($sheetExports as $sheetIndex => $sheetExport) {
+            $sheet = $writer->addNewSheet($sheetIndex);
+            $sheet->open($sheetExport);
+        }
+
+        $writer->cleanUp();
     }
 
     /**
