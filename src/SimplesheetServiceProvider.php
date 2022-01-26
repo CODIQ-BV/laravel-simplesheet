@@ -77,7 +77,8 @@ class SimplesheetServiceProvider extends ServiceProvider
                 $app->make(QueuedWriter::class),
                 $app->make(Reader::class),
                 $app->make(Filesystem::class),
-                $app->make(ResponseFactory::class)
+                $app->make(ResponseFactory::class),
+                $app->make(TemporaryFileFactory::class)
             );
         });
 

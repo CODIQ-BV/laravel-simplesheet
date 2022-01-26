@@ -4,11 +4,15 @@ namespace Nikazooz\Simplesheet;
 
 use Box\Spout\Common\Type;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Nikazooz\Simplesheet\Concerns\FromQuery;
+use Nikazooz\Simplesheet\Concerns\FromArray;
 use Illuminate\Contracts\Routing\ResponseFactory;
 use Illuminate\Foundation\Bus\PendingDispatch;
 use Illuminate\Support\Collection;
 use Nikazooz\Simplesheet\Files\Filesystem;
+use Nikazooz\Simplesheet\Concerns\FromCollection;
 use Nikazooz\Simplesheet\Helpers\FileTypeDetector;
+use Nikazooz\Simplesheet\Files\TemporaryFileFactory;
 
 class Simplesheet implements Exporter, Importer
 {
@@ -43,10 +47,16 @@ class Simplesheet implements Exporter, Importer
     protected $responseFactory;
 
     /**
+     * @var \Nikazooz\Simplesheet\Files\TemporaryFileFactory
+     */
+    protected $temporaryFileFactory;
+
+    /**
      * @param  \Nikazooz\Simplesheet\Writer  $writer
      * @param  \Nikazooz\Simplesheet\QueuedWriter  $queuedWriter
      * @param  \Nikazooz\Simplesheet\Files\Filesystem  $filesystem
      * @param  \Illuminate\Contracts\Routing\ResponseFactory  $responseFactory
+     * @param  \Nikazooz\Simplesheet\Files\TemporaryFileFactory  $temporaryFileFactory
      * @return void
      */
     public function __construct(
@@ -54,13 +64,15 @@ class Simplesheet implements Exporter, Importer
         QueuedWriter $queuedWriter,
         Reader $reader,
         Filesystem $filesystem,
-        ResponseFactory $responseFactory
+        ResponseFactory $responseFactory,
+        TemporaryFileFactory $temporaryFileFactory
     ) {
         $this->writer = $writer;
         $this->queuedWriter = $queuedWriter;
         $this->reader = $reader;
         $this->filesystem = $filesystem;
         $this->responseFactory = $responseFactory;
+        $this->temporaryFileFactory = $temporaryFileFactory;
     }
 
     /**
@@ -121,17 +133,50 @@ class Simplesheet implements Exporter, Importer
 
     /**
      * @param  object  $export
-     * @param  string  $fileName
+     * @param  string  $filePath
      * @param  string|null  $writerType
      * @return \Nikazooz\Simplesheet\Files\TemporaryFile
      *
      * @throws \Nikazooz\Simplesheet\NoTypeDetectedException
      */
-    protected function export($export, string $fileName, string $writerType = null, $diskOptions = [])
+    protected function export($export, string $filePath, string $writerType = null, $diskOptions = [])
     {
-        $writerType = FileTypeDetector::detect($fileName, $writerType);
+        $writerType = FileTypeDetector::detect($filePath, $writerType);
 
-        return $this->writer->export($export, $writerType);
+        $extension = pathinfo($filePath, PATHINFO_EXTENSION);
+        $temporaryFile = $this->temporaryFileFactory->make($extension);
+
+        $this->writer->open($export, $writerType, $temporaryFile);
+
+        $sheetExports = [$export];
+
+        // Pre-create the worksheets
+        foreach ($sheetExports as $sheetIndex => $sheetExport) {
+            $sheet = $this->writer->addNewSheet($sheetIndex);
+            $sheet->open($sheetExport);
+        }
+
+        $this->writer->cleanUp();
+
+        foreach ($sheetExports as $sheetIndex => $sheetExport) {
+            $writer = $this->writer->reopen($temporaryFile, $writerType);
+
+            $sheet = $writer->getSheetByIndex($sheetIndex);
+
+            $data = [];
+            if ($sheetExport instanceof FromCollection) {
+                $data = iterator_to_array($sheetExport->collection());
+            } elseif ($sheetExport instanceof FromQuery) {
+                $data = $sheetExport->query();
+            } elseif ($sheetExport instanceof FromArray) {
+                $data = $sheetExport->array();
+            }
+
+            $rowsToAppend = $sheet->getRowsToAppend($data, $sheetExport);
+            $writer->reopen($temporaryFile, $writerType, $rowsToAppend, $sheetIndex);
+        }
+
+        return $temporaryFile;
     }
 
     /**

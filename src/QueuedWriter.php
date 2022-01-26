@@ -2,6 +2,7 @@
 
 namespace Nikazooz\Simplesheet;
 
+use Nikazooz\Simplesheet\Concerns\FromArray;
 use Illuminate\Foundation\Bus\PendingDispatch;
 use Illuminate\Support\Collection;
 use Nikazooz\Simplesheet\Concerns\FromCollection;
@@ -86,6 +87,8 @@ class QueuedWriter
                 $jobs = $jobs->merge($this->exportCollection($sheetExport, $temporaryFile, $writerType, $sheetIndex));
             } elseif ($sheetExport instanceof FromQuery) {
                 $jobs = $jobs->merge($this->exportQuery($sheetExport, $temporaryFile, $writerType, $sheetIndex));
+            } elseif ($sheetExport instanceof FromArray) {
+                $jobs = $jobs->merge($this->exportArray($sheetExport, $temporaryFile, $writerType, $sheetIndex));
             }
 
             $jobs->push(new CloseSheet($sheetExport, $temporaryFile, $writerType, $sheetIndex));
@@ -109,6 +112,36 @@ class QueuedWriter
     ): Collection {
         return $export
             ->collection()
+            ->chunk($this->getChunkSize($export))
+            ->map(function ($rows) use ($writerType, $temporaryFile, $sheetIndex, $export) {
+                if ($rows instanceof Traversable) {
+                    $rows = iterator_to_array($rows);
+                }
+
+                return new AppendDataToSheet(
+                    $export,
+                    $temporaryFile,
+                    $writerType,
+                    $sheetIndex,
+                    $rows
+                );
+            });
+    }
+
+    /**
+     * @param  FromArray  $export
+     * @param  TemporaryFile  $temporaryFile
+     * @param  string  $writerType
+     * @param  int  $sheetIndex
+     * @return Collection
+     */
+    private function exportArray(
+        FromArray $export,
+        TemporaryFile $temporaryFile,
+        string $writerType,
+        int $sheetIndex
+    ): Collection {
+        return collect($export->array())
             ->chunk($this->getChunkSize($export))
             ->map(function ($rows) use ($writerType, $temporaryFile, $sheetIndex, $export) {
                 if ($rows instanceof Traversable) {

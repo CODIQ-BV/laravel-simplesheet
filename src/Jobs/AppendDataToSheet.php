@@ -73,8 +73,8 @@ class AppendDataToSheet implements ShouldQueue
 
         $sheet = $writer->getSheetByIndex($this->sheetIndex);
 
-        $sheet->appendRows($this->data, $this->sheetExport);
+        $rowsToAppend = $sheet->getRowsToAppend($this->data, $this->sheetExport);
 
-        $writer->write($this->sheetExport, $this->temporaryFile, $this->writerType);
+        $writer->reopen($this->temporaryFile, $this->writerType, $rowsToAppend, $this->sheetIndex);
     }
 }
