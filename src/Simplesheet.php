@@ -167,7 +167,7 @@ class Simplesheet implements Exporter, Importer
             if ($sheetExport instanceof FromCollection) {
                 $data = iterator_to_array($sheetExport->collection());
             } elseif ($sheetExport instanceof FromQuery) {
-                $data = $sheetExport->query();
+                $data = iterator_to_array($sheetExport->query()->get());
             } elseif ($sheetExport instanceof FromArray) {
                 $data = $sheetExport->array();
             }
