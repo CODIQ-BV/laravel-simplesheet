@@ -136,6 +136,7 @@ class Writer
         $this->spoutWriter->close();
 
         $tempFile->copyFrom($newTempFile->getLocalPath());
+        $newTempFile->delete();
 
         return $this;
     }
